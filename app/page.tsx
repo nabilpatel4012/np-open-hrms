@@ -2,99 +2,124 @@
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, Clock, MapPin, Users, Award, MessageSquare, Plus, CheckCircle, XCircle } from "lucide-react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Progress } from "@/components/ui/progress"
+import { Users, UserPlus, Calendar, FileText, Building, Loader2 } from "lucide-react"
 import Navigation from "@/components/navigation"
+import Link from "next/link"
+import type { Employee, EmployeeTemplate } from "@/lib/models"
 
-export default function Dashboard() {
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
-  const [attendanceStatus, setAttendanceStatus] = useState<"not-marked" | "checked-in" | "checked-out">("not-marked")
-  const [feedPosts, setFeedPosts] = useState([
-    {
-      id: 1,
-      author: "Sarah Johnson",
-      avatar: "/placeholder.svg?height=40&width=40",
-      type: "recognition",
-      content: "Great job on the Q4 presentation, John! Your attention to detail was outstanding.",
-      badge: "Excellence",
-      timestamp: "2 hours ago",
-      likes: 12,
+interface DashboardStats {
+  totalEmployees: number
+  activeEmployees: number
+  totalTemplates: number
+  departmentBreakdown: { [key: string]: number }
+  recentEmployees: Employee[]
+  leaveStats: {
+    totalLeaves: number
+    pendingLeaves: number
+    approvedLeaves: number
+  }
+}
+
+export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats>({
+    totalEmployees: 0,
+    activeEmployees: 0,
+    totalTemplates: 0,
+    departmentBreakdown: {},
+    recentEmployees: [],
+    leaveStats: {
+      totalLeaves: 0,
+      pendingLeaves: 0,
+      approvedLeaves: 0,
     },
-    {
-      id: 2,
-      author: "Mike Chen",
-      avatar: "/placeholder.svg?height=40&width=40",
-      type: "thanks",
-      content: "Thanks to the entire dev team for staying late to fix the production issue. Team work at its best!",
-      badge: "Team Player",
-      timestamp: "4 hours ago",
-      likes: 8,
-    },
-    {
-      id: 3,
-      author: "Lisa Rodriguez",
-      avatar: "/placeholder.svg?height=40&width=40",
-      type: "mentor",
-      content:
-        "Remember: Code reviews are not about finding faults, but about learning and improving together. Always be constructive in your feedback.",
-      badge: "Mentor",
-      timestamp: "1 day ago",
-      likes: 15,
-    },
-  ])
-  const [newPost, setNewPost] = useState("")
-  const [selectedBadge, setSelectedBadge] = useState("")
+  })
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Get user location for attendance
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          })
-        },
-        (error) => {
-          console.error("Error getting location:", error)
-        },
-      )
-    }
+    fetchDashboardData()
   }, [])
 
-  const markAttendance = (type: "check-in" | "check-out") => {
-    if (!location) {
-      alert("Location access is required for attendance marking")
-      return
-    }
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
 
-    // Here you would send the location data to your backend
-    console.log(`${type} at location:`, location)
-    setAttendanceStatus(type === "check-in" ? "checked-in" : "checked-out")
+      // Fetch employees and templates
+      const [employeesResponse, templatesResponse] = await Promise.all([
+        fetch("/api/employees"),
+        fetch("/api/templates"),
+      ])
+
+      if (employeesResponse.ok && templatesResponse.ok) {
+        const employees: Employee[] = await employeesResponse.json()
+        const templates: EmployeeTemplate[] = await templatesResponse.json()
+
+        // Calculate department breakdown
+        const departmentBreakdown = employees.reduce(
+          (acc, emp) => {
+            acc[emp.department] = (acc[emp.department] || 0) + 1
+            return acc
+          },
+          {} as { [key: string]: number },
+        )
+
+        // Get recent employees (last 5)
+        const recentEmployees = employees.slice(0, 5)
+
+        setStats({
+          totalEmployees: employees.length,
+          activeEmployees: employees.filter((emp) => emp.status === "Active").length,
+          totalTemplates: templates.length,
+          departmentBreakdown,
+          recentEmployees,
+          leaveStats: {
+            totalLeaves: 0, // Would be calculated from leave applications
+            pendingLeaves: 0,
+            approvedLeaves: 0,
+          },
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handlePostSubmit = () => {
-    if (!newPost.trim() || !selectedBadge) return
-
-    const post = {
-      id: feedPosts.length + 1,
-      author: "You",
-      avatar: "/placeholder.svg?height=40&width=40",
-      type: selectedBadge.toLowerCase(),
-      content: newPost,
-      badge: selectedBadge,
-      timestamp: "Just now",
-      likes: 0,
+  const getStatusBadge = (status: string) => {
+    const colors = {
+      Active: "bg-green-100 text-green-800",
+      Inactive: "bg-gray-100 text-gray-800",
+      "On Leave": "bg-yellow-100 text-yellow-800",
+      Terminated: "bg-red-100 text-red-800",
     }
+    return <Badge className={colors[status as keyof typeof colors] || "bg-gray-100 text-gray-800"}>{status}</Badge>
+  }
 
-    setFeedPosts([post, ...feedPosts])
-    setNewPost("")
-    setSelectedBadge("")
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(amount)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+              <p className="mt-4 text-gray-600">Loading dashboard...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -102,262 +127,159 @@ export default function Dashboard() {
       <Navigation />
 
       <div className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Overview Cards */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Welcome Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Welcome back, John Doe
-                </CardTitle>
-                <CardDescription>
-                  Today is{" "}
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "long",
-                    year: "numeric",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">This Month</p>
-                      <p className="text-2xl font-bold">22</p>
-                      <p className="text-xs text-muted-foreground">Working Days</p>
-                    </div>
-                    <Calendar className="h-8 w-8 text-blue-500" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Leave Balance</p>
-                      <p className="text-2xl font-bold">8.5</p>
-                      <p className="text-xs text-muted-foreground">Days Available</p>
-                    </div>
-                    <Clock className="h-8 w-8 text-green-500" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Recognition</p>
-                      <p className="text-2xl font-bold">5</p>
-                      <p className="text-xs text-muted-foreground">This Quarter</p>
-                    </div>
-                    <Award className="h-8 w-8 text-yellow-500" />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Feed Section */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
-                  Company Feed
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="feed" className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="feed">Feed</TabsTrigger>
-                    <TabsTrigger value="post">Create Post</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="feed" className="space-y-4 mt-4">
-                    {feedPosts.map((post) => (
-                      <div key={post.id} className="border rounded-lg p-4 space-y-3">
-                        <div className="flex items-start gap-3">
-                          <Avatar>
-                            <AvatarImage src={post.avatar || "/placeholder.svg"} />
-                            <AvatarFallback>
-                              {post.author
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold">{post.author}</span>
-                              <Badge variant="secondary">{post.badge}</Badge>
-                              <span className="text-sm text-muted-foreground">{post.timestamp}</span>
-                            </div>
-                            <p className="text-sm">{post.content}</p>
-                            <div className="flex items-center gap-2 mt-2">
-                              <Button variant="ghost" size="sm" className="h-8 px-2">
-                                👍 {post.likes}
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </TabsContent>
-
-                  <TabsContent value="post" className="space-y-4 mt-4">
-                    <div className="space-y-4">
-                      <Textarea
-                        placeholder="Share recognition, thanks, or mentoring advice..."
-                        value={newPost}
-                        onChange={(e) => setNewPost(e.target.value)}
-                        className="min-h-[100px]"
-                      />
-                      <div className="flex items-center gap-4">
-                        <Select value={selectedBadge} onValueChange={setSelectedBadge}>
-                          <SelectTrigger className="w-[200px]">
-                            <SelectValue placeholder="Select badge type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Recognition">Recognition</SelectItem>
-                            <SelectItem value="Thanks">Thanks</SelectItem>
-                            <SelectItem value="Mentor">Mentor</SelectItem>
-                            <SelectItem value="Team Player">Team Player</SelectItem>
-                            <SelectItem value="Excellence">Excellence</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <Button onClick={handlePostSubmit} disabled={!newPost.trim() || !selectedBadge}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Post
-                        </Button>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column - Attendance & Quick Actions */}
-          <div className="space-y-6">
-            {/* Attendance Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5" />
-                  Attendance
-                </CardTitle>
-                <CardDescription>
-                  {location
-                    ? `Location: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`
-                    : "Getting location..."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm">Status:</span>
-                  <Badge
-                    variant={
-                      attendanceStatus === "checked-in"
-                        ? "default"
-                        : attendanceStatus === "checked-out"
-                          ? "secondary"
-                          : "outline"
-                    }
-                  >
-                    {attendanceStatus === "checked-in"
-                      ? "Checked In"
-                      : attendanceStatus === "checked-out"
-                        ? "Checked Out"
-                        : "Not Marked"}
-                  </Badge>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    onClick={() => markAttendance("check-in")}
-                    disabled={attendanceStatus === "checked-in"}
-                    className="w-full"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Check In
-                  </Button>
-                  <Button
-                    onClick={() => markAttendance("check-out")}
-                    disabled={attendanceStatus !== "checked-in"}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Check Out
-                  </Button>
-                </div>
-
-                {attendanceStatus === "checked-in" && (
-                  <div className="text-center text-sm text-muted-foreground">Checked in at 9:15 AM</div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Upcoming Events */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Upcoming Events</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-3 p-2 border rounded">
-                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Christmas Day</p>
-                    <p className="text-xs text-muted-foreground">Dec 25, 2024</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-2 border rounded">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Team Meeting</p>
-                    <p className="text-xs text-muted-foreground">Tomorrow, 2:00 PM</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-2 border rounded">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Performance Review</p>
-                    <p className="text-xs text-muted-foreground">Next Week</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  Apply for Leave
-                </Button>
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  View Payslip
-                </Button>
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  Employee Directory
-                </Button>
-                <Button variant="outline" className="w-full justify-start bg-transparent">
-                  Performance Review
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-gray-600">Welcome to your HRMS dashboard</p>
         </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Employees</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalEmployees}</div>
+              <p className="text-xs text-muted-foreground">{stats.activeEmployees} active employees</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Employee Templates</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalTemplates}</div>
+              <p className="text-xs text-muted-foreground">Ready for onboarding</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Departments</CardTitle>
+              <Building className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{Object.keys(stats.departmentBreakdown).length}</div>
+              <p className="text-xs text-muted-foreground">Active departments</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Leave Requests</CardTitle>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.leaveStats.pendingLeaves}</div>
+              <p className="text-xs text-muted-foreground">Pending approval</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Department Breakdown */}
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Department Overview</CardTitle>
+              <CardDescription>Employee distribution across departments</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {Object.entries(stats.departmentBreakdown).map(([department, count]) => (
+                <div key={department} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Building className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{department}</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Progress value={(count / stats.totalEmployees) * 100} className="w-20" />
+                    <span className="text-sm text-muted-foreground w-8">{count}</span>
+                  </div>
+                </div>
+              ))}
+              {Object.keys(stats.departmentBreakdown).length === 0 && (
+                <div className="text-center py-8">
+                  <Building className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No departments found</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Employees */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Employees</CardTitle>
+              <CardDescription>Latest additions to the team</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {stats.recentEmployees.map((employee) => (
+                <div key={employee.id} className="flex items-center space-x-3">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="/placeholder-user.jpg" alt={employee.name} />
+                    <AvatarFallback>{employee.name.charAt(0)}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{employee.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{employee.position}</p>
+                  </div>
+                  {getStatusBadge(employee.status)}
+                </div>
+              ))}
+              {stats.recentEmployees.length === 0 && (
+                <div className="text-center py-8">
+                  <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground mb-4">No employees found</p>
+                  <Link href="/admin/employees/create">
+                    <Button size="sm">
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add Employee
+                    </Button>
+                  </Link>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+            <CardDescription>Common tasks and shortcuts</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Link href="/admin/employees/create">
+                <Button className="w-full bg-transparent" variant="outline">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add Employee
+                </Button>
+              </Link>
+              <Link href="/admin/templates">
+                <Button className="w-full bg-transparent" variant="outline">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Manage Templates
+                </Button>
+              </Link>
+              <Link href="/employees">
+                <Button className="w-full bg-transparent" variant="outline">
+                  <Users className="h-4 w-4 mr-2" />
+                  View All Employees
+                </Button>
+              </Link>
+              <Link href="/leaves">
+                <Button className="w-full bg-transparent" variant="outline">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Leave Management
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

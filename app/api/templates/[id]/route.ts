@@ -1,17 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { ObjectId } from "mongodb"
-import clientPromise from "@/lib/mongodb"
+import { createServerSupabaseClient } from "@/lib/supabase"
 import type { EmployeeTemplate } from "@/lib/models"
 
 export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const client = await clientPromise
-    const db = client.db("hrms")
-    const template = await db.collection<EmployeeTemplate>("templates").findOne({
-      _id: new ObjectId(params.id),
-    })
+    const supabase = createServerSupabaseClient()
 
-    if (!template) {
+    const { data: template, error } = await supabase.from("employee_templates").select("*").eq("id", params.id).single()
+
+    if (error) {
+      console.error("Supabase error:", error)
       return NextResponse.json({ error: "Template not found" }, { status: 404 })
     }
 
@@ -25,24 +23,21 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   try {
     const updates: Partial<EmployeeTemplate> = await request.json()
-    const client = await clientPromise
-    const db = client.db("hrms")
+    const supabase = createServerSupabaseClient()
 
-    const result = await db.collection<EmployeeTemplate>("templates").updateOne(
-      { _id: new ObjectId(params.id) },
-      {
-        $set: {
-          ...updates,
-          updatedAt: new Date(),
-        },
-      },
-    )
+    const { data: template, error } = await supabase
+      .from("employee_templates")
+      .update(updates)
+      .eq("id", params.id)
+      .select()
+      .single()
 
-    if (result.matchedCount === 0) {
-      return NextResponse.json({ error: "Template not found" }, { status: 404 })
+    if (error) {
+      console.error("Supabase error:", error)
+      return NextResponse.json({ error: "Failed to update template" }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json(template)
   } catch (error) {
     console.error("Error updating template:", error)
     return NextResponse.json({ error: "Failed to update template" }, { status: 500 })
@@ -51,15 +46,13 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const client = await clientPromise
-    const db = client.db("hrms")
+    const supabase = createServerSupabaseClient()
 
-    const result = await db.collection<EmployeeTemplate>("templates").deleteOne({
-      _id: new ObjectId(params.id),
-    })
+    const { error } = await supabase.from("employee_templates").delete().eq("id", params.id)
 
-    if (result.deletedCount === 0) {
-      return NextResponse.json({ error: "Template not found" }, { status: 404 })
+    if (error) {
+      console.error("Supabase error:", error)
+      return NextResponse.json({ error: "Failed to delete template" }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })

@@ -1,103 +1,69 @@
 export interface EmployeeTemplate {
-  _id?: string
-  name: string // e.g., "Junior Engineer", "Senior Manager"
+  id?: string
+  name: string
   department: string
   position: string
   level: "Junior" | "Mid" | "Senior" | "Lead" | "Manager" | "Director"
-  ctc: {
-    basicSalary: number
-    hra: number
-    allowances: number
-    bonus: number
-    totalCTC: number
-  }
-  leaves: {
-    EL: number // Earned Leave
-    CL: number // Casual Leave
-    PL: number // Paternity Leave
-    ML: number // Maternity Leave
-    CompOff: number // Comp Off
-  }
-  workingDays: number
-  probationPeriod: number // in months
-  noticePeriod: number // in days
+  basic_salary: number
+  hra: number
+  allowances: number
+  bonus: number
+  total_ctc: number
+  earned_leave: number
+  casual_leave: number
+  paternity_leave: number
+  maternity_leave: number
+  comp_off: number
+  working_days: number
+  probation_period: number
+  notice_period: number
   benefits: string[]
-  createdBy: string
-  createdAt: Date
-  updatedAt: Date
+  created_by: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Employee {
-  _id?: string
-  templateId?: string
-  employeeId: string
-  personalInfo: {
-    name: string
-    email: string
-    phone: string
-    dateOfBirth: Date
-    address: string
-    emergencyContact: {
-      name: string
-      phone: string
-      relation: string
-    }
-  }
-  workInfo: {
-    department: string
-    position: string
-    level: string
-    manager: string
-    location: string
-    joinDate: Date
-    employmentType: "Full-time" | "Part-time" | "Contract" | "Intern"
-    status: "Active" | "Inactive" | "On Leave" | "Terminated"
-  }
-  compensation: {
-    basicSalary: number
-    hra: number
-    allowances: number
-    bonus: number
-    totalCTC: number
-  }
-  leaves: {
-    EL: { total: number; used: number; remaining: number }
-    CL: { total: number; used: number; remaining: number }
-    PL: { total: number; used: number; remaining: number }
-    ML: { total: number; used: number; remaining: number }
-    CompOff: { total: number; used: number; remaining: number }
-  }
-  createdBy: string
-  createdAt: Date
-  updatedAt: Date
-}
-
-export interface LeaveApplication {
-  _id?: string
-  employeeId: string
-  leaveType: "EL" | "CL" | "PL" | "ML" | "CompOff"
-  startDate: Date
-  endDate: Date
-  days: number
-  reason: string
-  status: "Pending" | "Approved" | "Rejected"
-  appliedOn: Date
-  approver?: string
-  approvedOn?: Date
-  comments?: string
-}
-
-export interface AttendanceRecord {
-  _id?: string
-  employeeId: string
-  date: Date
-  checkIn?: Date
-  checkOut?: Date
-  location: {
-    latitude: number
-    longitude: number
-  }
-  status: "Present" | "Late" | "Absent" | "Half Day"
-  workingHours: number
-  createdAt: Date
+  id?: string
+  employee_id: string
+  template_id?: string
+  name: string
+  email: string
+  phone?: string
+  date_of_birth?: string
+  address?: string
+  emergency_contact_name?: string
+  emergency_contact_phone?: string
+  emergency_contact_relation?: string
+  department: string
+  position: string
+  level: string
+  manager?: string
+  location?: string
+  join_date: string
+  employment_type: "Full-time" | "Part-time" | "Contract" | "Intern"
+  status: "Active" | "Inactive" | "On Leave" | "Terminated"
+  basic_salary: number
+  hra: number
+  allowances: number
+  bonus: number
+  total_ctc: number
+  el_total: number
+  el_used: number
+  el_remaining: number
+  cl_total: number
+  cl_used: number
+  cl_remaining: number
+  pl_total: number
+  pl_used: number
+  pl_remaining: number
+  ml_total: number
+  ml_used: number
+  ml_remaining: number
+  comp_off_total: number
+  comp_off_used: number
+  comp_off_remaining: number
+  created_by: string
+  created_at?: string
+  updated_at?: string
 }

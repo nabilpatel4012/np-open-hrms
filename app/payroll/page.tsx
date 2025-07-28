@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DollarSign, Download, Eye, FileText, TrendingUp, Calendar } from "lucide-react"
+import { DollarSign, Download, Eye, FileText, TrendingUp, Calendar, Users, Calculator } from "lucide-react"
 import Navigation from "@/components/navigation"
 
 export default function PayrollPage() {
@@ -109,12 +109,81 @@ export default function PayrollPage() {
       <Navigation />
 
       <div className="container mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold">Payroll & Compensation</h1>
-          <p className="text-muted-foreground">View your salary details and tax documents</p>
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Payroll</h1>
+            <p className="text-muted-foreground">Manage employee compensation and payroll processing</p>
+          </div>
+          <Button>
+            <Calculator className="h-4 w-4 mr-2" />
+            Process Payroll
+          </Button>
         </div>
 
-        <Tabs defaultValue="overview" className="w-full">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Payroll</CardTitle>
+              <DollarSign className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">$245,000</div>
+              <p className="text-xs text-muted-foreground">This month</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Avg. Salary</CardTitle>
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">$4,900</div>
+              <p className="text-xs text-muted-foreground">Per employee</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Employees Paid</CardTitle>
+              <Users className="h-4 w-4 text-purple-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">50</div>
+              <p className="text-xs text-muted-foreground">Out of 50 total</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending</CardTitle>
+              <Calculator className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0</div>
+              <p className="text-xs text-muted-foreground">Payroll items</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Payroll Overview</CardTitle>
+            <CardDescription>Monthly payroll processing and salary management</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-12">
+              <DollarSign className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Payroll Management System</h3>
+              <p className="text-muted-foreground mb-4">
+                This feature will handle salary calculations, tax deductions, and payroll processing.
+              </p>
+              <Button>Configure Payroll Settings</Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Tabs defaultValue="overview" className="w-full mt-8">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="payslips">Payslips</TabsTrigger>

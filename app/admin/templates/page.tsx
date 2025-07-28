@@ -9,36 +9,35 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Edit, Trash2, Copy, FileIcon as FileTemplate } from "lucide-react"
+import { Plus, Edit, Trash2, Copy, FileIcon as FileTemplate, Loader2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 import Navigation from "@/components/navigation"
 import type { EmployeeTemplate } from "@/lib/models"
 
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<EmployeeTemplate[]>([])
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [selectedTemplate, setSelectedTemplate] = useState<EmployeeTemplate | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
+
   const [formData, setFormData] = useState<Partial<EmployeeTemplate>>({
     name: "",
     department: "",
     position: "",
     level: "Junior",
-    ctc: {
-      basicSalary: 0,
-      hra: 0,
-      allowances: 0,
-      bonus: 0,
-      totalCTC: 0,
-    },
-    leaves: {
-      EL: 18,
-      CL: 4,
-      PL: 5,
-      ML: 28,
-      CompOff: 2,
-    },
-    workingDays: 22,
-    probationPeriod: 6,
-    noticePeriod: 30,
+    basic_salary: 0,
+    hra: 0,
+    allowances: 0,
+    bonus: 0,
+    earned_leave: 18,
+    casual_leave: 4,
+    paternity_leave: 5,
+    maternity_leave: 28,
+    comp_off: 2,
+    working_days: 22,
+    probation_period: 6,
+    notice_period: 30,
     benefits: [],
   })
 
@@ -48,29 +47,36 @@ export default function TemplatesPage() {
 
   const fetchTemplates = async () => {
     try {
+      setIsLoading(true)
       const response = await fetch("/api/templates")
       if (response.ok) {
         const data = await response.json()
         setTemplates(data)
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to fetch templates",
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error("Error fetching templates:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch templates",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleCreateTemplate = async () => {
     try {
+      setIsSubmitting(true)
       const templateData = {
         ...formData,
-        ctc: {
-          ...formData.ctc,
-          totalCTC:
-            (formData.ctc?.basicSalary || 0) +
-            (formData.ctc?.hra || 0) +
-            (formData.ctc?.allowances || 0) +
-            (formData.ctc?.bonus || 0),
-        },
-        createdBy: "Admin", // In real app, get from auth context
+        created_by: "Admin", // In real app, get from auth context
       }
 
       const response = await fetch("/api/templates", {
@@ -83,9 +89,26 @@ export default function TemplatesPage() {
         await fetchTemplates()
         setIsCreateDialogOpen(false)
         resetForm()
+        toast({
+          title: "Success",
+          description: "Template created successfully",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to create template",
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error("Error creating template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create template",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -95,14 +118,52 @@ export default function TemplatesPage() {
       department: template.department,
       position: template.position,
       level: template.level,
-      ctc: { ...template.ctc },
-      leaves: { ...template.leaves },
-      workingDays: template.workingDays,
-      probationPeriod: template.probationPeriod,
-      noticePeriod: template.noticePeriod,
+      basic_salary: template.basic_salary,
+      hra: template.hra,
+      allowances: template.allowances,
+      bonus: template.bonus,
+      earned_leave: template.earned_leave,
+      casual_leave: template.casual_leave,
+      paternity_leave: template.paternity_leave,
+      maternity_leave: template.maternity_leave,
+      comp_off: template.comp_off,
+      working_days: template.working_days,
+      probation_period: template.probation_period,
+      notice_period: template.notice_period,
       benefits: [...template.benefits],
     })
     setIsCreateDialogOpen(true)
+  }
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    if (!confirm("Are you sure you want to delete this template?")) return
+
+    try {
+      const response = await fetch(`/api/templates/${templateId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        await fetchTemplates()
+        toast({
+          title: "Success",
+          description: "Template deleted successfully",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to delete template",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("Error deleting template:", error)
+      toast({
+        title: "Error",
+        description: "Failed to delete template",
+        variant: "destructive",
+      })
+    }
   }
 
   const resetForm = () => {
@@ -111,23 +172,18 @@ export default function TemplatesPage() {
       department: "",
       position: "",
       level: "Junior",
-      ctc: {
-        basicSalary: 0,
-        hra: 0,
-        allowances: 0,
-        bonus: 0,
-        totalCTC: 0,
-      },
-      leaves: {
-        EL: 18,
-        CL: 4,
-        PL: 5,
-        ML: 28,
-        CompOff: 2,
-      },
-      workingDays: 22,
-      probationPeriod: 6,
-      noticePeriod: 30,
+      basic_salary: 0,
+      hra: 0,
+      allowances: 0,
+      bonus: 0,
+      earned_leave: 18,
+      casual_leave: 4,
+      paternity_leave: 5,
+      maternity_leave: 28,
+      comp_off: 2,
+      working_days: 22,
+      probation_period: 6,
+      notice_period: 30,
       benefits: [],
     })
   }
@@ -149,6 +205,26 @@ export default function TemplatesPage() {
       style: "currency",
       currency: "USD",
     }).format(amount)
+  }
+
+  const calculateTotalCTC = () => {
+    return (formData.basic_salary || 0) + (formData.hra || 0) + (formData.allowances || 0) + (formData.bonus || 0)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+              <p className="mt-4 text-gray-600">Loading templates...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -206,7 +282,7 @@ export default function TemplatesPage() {
                           <SelectItem value="Design">Design</SelectItem>
                           <SelectItem value="Marketing">Marketing</SelectItem>
                           <SelectItem value="Sales">Sales</SelectItem>
-                          <SelectItem value="HR">Human Resources</SelectItem>
+                          <SelectItem value="Human Resources">Human Resources</SelectItem>
                           <SelectItem value="Finance">Finance</SelectItem>
                         </SelectContent>
                       </Select>
@@ -250,11 +326,11 @@ export default function TemplatesPage() {
                       <Label>Basic Salary</Label>
                       <Input
                         type="number"
-                        value={formData.ctc?.basicSalary || 0}
+                        value={formData.basic_salary || 0}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            ctc: { ...formData.ctc!, basicSalary: Number(e.target.value) },
+                            basic_salary: Number(e.target.value),
                           })
                         }
                       />
@@ -263,11 +339,11 @@ export default function TemplatesPage() {
                       <Label>HRA</Label>
                       <Input
                         type="number"
-                        value={formData.ctc?.hra || 0}
+                        value={formData.hra || 0}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            ctc: { ...formData.ctc!, hra: Number(e.target.value) },
+                            hra: Number(e.target.value),
                           })
                         }
                       />
@@ -279,11 +355,11 @@ export default function TemplatesPage() {
                       <Label>Other Allowances</Label>
                       <Input
                         type="number"
-                        value={formData.ctc?.allowances || 0}
+                        value={formData.allowances || 0}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            ctc: { ...formData.ctc!, allowances: Number(e.target.value) },
+                            allowances: Number(e.target.value),
                           })
                         }
                       />
@@ -292,11 +368,11 @@ export default function TemplatesPage() {
                       <Label>Performance Bonus</Label>
                       <Input
                         type="number"
-                        value={formData.ctc?.bonus || 0}
+                        value={formData.bonus || 0}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            ctc: { ...formData.ctc!, bonus: Number(e.target.value) },
+                            bonus: Number(e.target.value),
                           })
                         }
                       />
@@ -304,15 +380,7 @@ export default function TemplatesPage() {
                   </div>
 
                   <div className="p-4 bg-blue-50 rounded-lg">
-                    <p className="font-medium">
-                      Total CTC:{" "}
-                      {formatCurrency(
-                        (formData.ctc?.basicSalary || 0) +
-                          (formData.ctc?.hra || 0) +
-                          (formData.ctc?.allowances || 0) +
-                          (formData.ctc?.bonus || 0),
-                      )}
-                    </p>
+                    <p className="font-medium">Total CTC: {formatCurrency(calculateTotalCTC())}</p>
                   </div>
                 </TabsContent>
 
@@ -322,11 +390,11 @@ export default function TemplatesPage() {
                       <Label>Earned Leave (EL)</Label>
                       <Input
                         type="number"
-                        value={formData.leaves?.EL || 18}
+                        value={formData.earned_leave || 18}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            leaves: { ...formData.leaves!, EL: Number(e.target.value) },
+                            earned_leave: Number(e.target.value),
                           })
                         }
                       />
@@ -335,11 +403,11 @@ export default function TemplatesPage() {
                       <Label>Casual Leave (CL)</Label>
                       <Input
                         type="number"
-                        value={formData.leaves?.CL || 4}
+                        value={formData.casual_leave || 4}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            leaves: { ...formData.leaves!, CL: Number(e.target.value) },
+                            casual_leave: Number(e.target.value),
                           })
                         }
                       />
@@ -348,11 +416,11 @@ export default function TemplatesPage() {
                       <Label>Paternity Leave (PL)</Label>
                       <Input
                         type="number"
-                        value={formData.leaves?.PL || 5}
+                        value={formData.paternity_leave || 5}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            leaves: { ...formData.leaves!, PL: Number(e.target.value) },
+                            paternity_leave: Number(e.target.value),
                           })
                         }
                       />
@@ -364,11 +432,11 @@ export default function TemplatesPage() {
                       <Label>Maternity Leave (ML)</Label>
                       <Input
                         type="number"
-                        value={formData.leaves?.ML || 28}
+                        value={formData.maternity_leave || 28}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            leaves: { ...formData.leaves!, ML: Number(e.target.value) },
+                            maternity_leave: Number(e.target.value),
                           })
                         }
                       />
@@ -377,11 +445,11 @@ export default function TemplatesPage() {
                       <Label>Comp Off</Label>
                       <Input
                         type="number"
-                        value={formData.leaves?.CompOff || 2}
+                        value={formData.comp_off || 2}
                         onChange={(e) =>
                           setFormData({
                             ...formData,
-                            leaves: { ...formData.leaves!, CompOff: Number(e.target.value) },
+                            comp_off: Number(e.target.value),
                           })
                         }
                       />
@@ -395,24 +463,24 @@ export default function TemplatesPage() {
                       <Label>Working Days/Month</Label>
                       <Input
                         type="number"
-                        value={formData.workingDays || 22}
-                        onChange={(e) => setFormData({ ...formData, workingDays: Number(e.target.value) })}
+                        value={formData.working_days || 22}
+                        onChange={(e) => setFormData({ ...formData, working_days: Number(e.target.value) })}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Probation Period (Months)</Label>
                       <Input
                         type="number"
-                        value={formData.probationPeriod || 6}
-                        onChange={(e) => setFormData({ ...formData, probationPeriod: Number(e.target.value) })}
+                        value={formData.probation_period || 6}
+                        onChange={(e) => setFormData({ ...formData, probation_period: Number(e.target.value) })}
                       />
                     </div>
                     <div className="space-y-2">
                       <Label>Notice Period (Days)</Label>
                       <Input
                         type="number"
-                        value={formData.noticePeriod || 30}
-                        onChange={(e) => setFormData({ ...formData, noticePeriod: Number(e.target.value) })}
+                        value={formData.notice_period || 30}
+                        onChange={(e) => setFormData({ ...formData, notice_period: Number(e.target.value) })}
                       />
                     </div>
                   </div>
@@ -423,7 +491,10 @@ export default function TemplatesPage() {
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreateTemplate}>Create Template</Button>
+                <Button onClick={handleCreateTemplate} disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Create Template
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -432,7 +503,7 @@ export default function TemplatesPage() {
         {/* Templates Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {templates.map((template) => (
-            <Card key={template._id} className="hover:shadow-lg transition-shadow">
+            <Card key={template.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>
@@ -448,15 +519,15 @@ export default function TemplatesPage() {
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total CTC:</span>
-                    <span className="font-medium">{formatCurrency(template.ctc.totalCTC)}</span>
+                    <span className="font-medium">{formatCurrency(template.total_ctc)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Total Leaves:</span>
-                    <span className="font-medium">{template.leaves.EL + template.leaves.CL} days</span>
+                    <span className="font-medium">{template.earned_leave + template.casual_leave} days</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Notice Period:</span>
-                    <span className="font-medium">{template.noticePeriod} days</span>
+                    <span className="font-medium">{template.notice_period} days</span>
                   </div>
                 </div>
 
@@ -469,7 +540,12 @@ export default function TemplatesPage() {
                     <Edit className="h-4 w-4 mr-1" />
                     Edit
                   </Button>
-                  <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 bg-transparent">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700 bg-transparent"
+                    onClick={() => handleDeleteTemplate(template.id!)}
+                  >
                     <Trash2 className="h-4 w-4 mr-1" />
                     Delete
                   </Button>

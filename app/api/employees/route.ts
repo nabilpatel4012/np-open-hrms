@@ -1,12 +1,27 @@
 import { type NextRequest, NextResponse } from "next/server"
-import clientPromise from "@/lib/mongodb"
+import { createServerSupabaseClient } from "@/lib/supabase"
 import type { Employee } from "@/lib/models"
 
 export async function GET() {
   try {
-    const client = await clientPromise
-    const db = client.db("hrms")
-    const employees = await db.collection<Employee>("employees").find({}).toArray()
+    const supabase = createServerSupabaseClient()
+
+    const { data: employees, error } = await supabase
+      .from("employees")
+      .select(`
+        *,
+        employee_templates (
+          name,
+          department,
+          position
+        )
+      `)
+      .order("created_at", { ascending: false })
+
+    if (error) {
+      console.error("Supabase error:", error)
+      return NextResponse.json({ error: "Failed to fetch employees" }, { status: 500 })
+    }
 
     return NextResponse.json(employees)
   } catch (error) {
@@ -17,24 +32,44 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const employeeData: Employee = await request.json()
-    const client = await clientPromise
-    const db = client.db("hrms")
+    const employeeData: Omit<
+      Employee,
+      | "id"
+      | "employee_id"
+      | "created_at"
+      | "updated_at"
+      | "total_ctc"
+      | "el_remaining"
+      | "cl_remaining"
+      | "pl_remaining"
+      | "ml_remaining"
+      | "comp_off_remaining"
+    > = await request.json()
+    const supabase = createServerSupabaseClient()
 
     // Generate employee ID
-    const count = await db.collection("employees").countDocuments()
-    const employeeId = `EMP${String(count + 1).padStart(3, "0")}`
+    const { count } = await supabase.from("employees").select("*", { count: "exact", head: true })
 
-    const newEmployee = {
-      ...employeeData,
-      employeeId,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    const employeeId = `EMP${String((count || 0) + 1).padStart(3, "0")}`
+
+    const { data: employee, error } = await supabase
+      .from("employees")
+      .insert([
+        {
+          ...employeeData,
+          employee_id: employeeId,
+          created_by: employeeData.created_by || "Admin",
+        },
+      ])
+      .select()
+      .single()
+
+    if (error) {
+      console.error("Supabase error:", error)
+      return NextResponse.json({ error: "Failed to create employee" }, { status: 500 })
     }
 
-    const result = await db.collection<Employee>("employees").insertOne(newEmployee)
-
-    return NextResponse.json({ _id: result.insertedId, ...newEmployee })
+    return NextResponse.json(employee)
   } catch (error) {
     console.error("Error creating employee:", error)
     return NextResponse.json({ error: "Failed to create employee" }, { status: 500 })

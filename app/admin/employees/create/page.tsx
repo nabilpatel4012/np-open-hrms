@@ -9,55 +9,52 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { CalendarIcon, UserPlus, FileIcon as FileTemplate } from "lucide-react"
+import { CalendarIcon, UserPlus, FileIcon as FileTemplate, Loader2 } from "lucide-react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
+import { useToast } from "@/hooks/use-toast"
 import Navigation from "@/components/navigation"
-import type { EmployeeTemplate, Employee } from "@/lib/models"
+import type { EmployeeTemplate } from "@/lib/models"
 
 export default function CreateEmployeePage() {
   const [templates, setTemplates] = useState<EmployeeTemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<EmployeeTemplate | null>(null)
   const [joinDate, setJoinDate] = useState<Date>()
   const [dateOfBirth, setDateOfBirth] = useState<Date>()
-  const [employeeData, setEmployeeData] = useState<Partial<Employee>>({
-    personalInfo: {
-      name: "",
-      email: "",
-      phone: "",
-      dateOfBirth: new Date(),
-      address: "",
-      emergencyContact: {
-        name: "",
-        phone: "",
-        relation: "",
-      },
-    },
-    workInfo: {
-      department: "",
-      position: "",
-      level: "",
-      manager: "",
-      location: "",
-      joinDate: new Date(),
-      employmentType: "Full-time",
-      status: "Active",
-    },
-    compensation: {
-      basicSalary: 0,
-      hra: 0,
-      allowances: 0,
-      bonus: 0,
-      totalCTC: 0,
-    },
-    leaves: {
-      EL: { total: 0, used: 0, remaining: 0 },
-      CL: { total: 0, used: 0, remaining: 0 },
-      PL: { total: 0, used: 0, remaining: 0 },
-      ML: { total: 0, used: 0, remaining: 0 },
-      CompOff: { total: 0, used: 0, remaining: 0 },
-    },
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { toast } = useToast()
+
+  const [employeeData, setEmployeeData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    emergency_contact_name: "",
+    emergency_contact_phone: "",
+    emergency_contact_relation: "",
+    department: "",
+    position: "",
+    level: "",
+    manager: "",
+    location: "",
+    employment_type: "Full-time" as const,
+    status: "Active" as const,
+    basic_salary: 0,
+    hra: 0,
+    allowances: 0,
+    bonus: 0,
+    el_total: 0,
+    el_used: 0,
+    cl_total: 0,
+    cl_used: 0,
+    pl_total: 0,
+    pl_used: 0,
+    ml_total: 0,
+    ml_used: 0,
+    comp_off_total: 0,
+    comp_off_used: 0,
   })
 
   useEffect(() => {
@@ -66,58 +63,86 @@ export default function CreateEmployeePage() {
 
   const fetchTemplates = async () => {
     try {
+      setIsLoading(true)
       const response = await fetch("/api/templates")
       if (response.ok) {
         const data = await response.json()
         setTemplates(data)
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to fetch templates",
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error("Error fetching templates:", error)
+      toast({
+        title: "Error",
+        description: "Failed to fetch templates",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleTemplateSelect = (templateId: string) => {
-    const template = templates.find((t) => t._id === templateId)
+    const template = templates.find((t) => t.id === templateId)
     if (template) {
       setSelectedTemplate(template)
 
       // Pre-fill form with template data
       setEmployeeData((prev) => ({
         ...prev,
-        templateId: template._id,
-        workInfo: {
-          ...prev.workInfo!,
-          department: template.department,
-          position: template.position,
-          level: template.level,
-        },
-        compensation: {
-          ...template.ctc,
-        },
-        leaves: {
-          EL: { total: template.leaves.EL, used: 0, remaining: template.leaves.EL },
-          CL: { total: template.leaves.CL, used: 0, remaining: template.leaves.CL },
-          PL: { total: template.leaves.PL, used: 0, remaining: template.leaves.PL },
-          ML: { total: template.leaves.ML, used: 0, remaining: template.leaves.ML },
-          CompOff: { total: template.leaves.CompOff, used: 0, remaining: template.leaves.CompOff },
-        },
+        department: template.department,
+        position: template.position,
+        level: template.level,
+        basic_salary: template.basic_salary,
+        hra: template.hra,
+        allowances: template.allowances,
+        bonus: template.bonus,
+        el_total: template.earned_leave,
+        el_used: 0,
+        cl_total: template.casual_leave,
+        cl_used: 0,
+        pl_total: template.paternity_leave,
+        pl_used: 0,
+        ml_total: template.maternity_leave,
+        ml_used: 0,
+        comp_off_total: template.comp_off,
+        comp_off_used: 0,
       }))
     }
   }
 
   const handleCreateEmployee = async () => {
+    if (!selectedTemplate) {
+      toast({
+        title: "Error",
+        description: "Please select a template",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!employeeData.name || !employeeData.email) {
+      toast({
+        title: "Error",
+        description: "Please fill in required fields",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
+      setIsSubmitting(true)
       const finalData = {
         ...employeeData,
-        personalInfo: {
-          ...employeeData.personalInfo!,
-          dateOfBirth: dateOfBirth || new Date(),
-        },
-        workInfo: {
-          ...employeeData.workInfo!,
-          joinDate: joinDate || new Date(),
-        },
-        createdBy: "Admin", // In real app, get from auth context
+        template_id: selectedTemplate.id,
+        date_of_birth: dateOfBirth?.toISOString().split("T")[0] || null,
+        join_date: joinDate?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
+        created_by: "Admin", // In real app, get from auth context
       }
 
       const response = await fetch("/api/employees", {
@@ -127,11 +152,28 @@ export default function CreateEmployeePage() {
       })
 
       if (response.ok) {
-        // Redirect to employees page or show success message
+        toast({
+          title: "Success",
+          description: "Employee created successfully",
+        })
+        // Redirect to employees page
         window.location.href = "/employees"
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to create employee",
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error("Error creating employee:", error)
+      toast({
+        title: "Error",
+        description: "Failed to create employee",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -140,6 +182,26 @@ export default function CreateEmployeePage() {
       style: "currency",
       currency: "USD",
     }).format(amount)
+  }
+
+  const calculateTotalCTC = () => {
+    return employeeData.basic_salary + employeeData.hra + employeeData.allowances + employeeData.bonus
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navigation />
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+              <p className="mt-4 text-gray-600">Loading templates...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -166,13 +228,13 @@ export default function CreateEmployeePage() {
               <CardContent className="space-y-3">
                 {templates.map((template) => (
                   <div
-                    key={template._id}
+                    key={template.id}
                     className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedTemplate?._id === template._id
+                      selectedTemplate?.id === template.id
                         ? "border-blue-500 bg-blue-50"
                         : "border-gray-200 hover:border-gray-300"
                     }`}
-                    onClick={() => handleTemplateSelect(template._id!)}
+                    onClick={() => handleTemplateSelect(template.id!)}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium text-sm">{template.name}</h4>
@@ -181,7 +243,7 @@ export default function CreateEmployeePage() {
                       </Badge>
                     </div>
                     <p className="text-xs text-muted-foreground">{template.department}</p>
-                    <p className="text-xs font-medium">{formatCurrency(template.ctc.totalCTC)}</p>
+                    <p className="text-xs font-medium">{formatCurrency(template.total_ctc)}</p>
                   </div>
                 ))}
               </CardContent>
@@ -199,11 +261,13 @@ export default function CreateEmployeePage() {
                   </div>
                   <div className="flex justify-between">
                     <span>CTC:</span>
-                    <span className="font-medium">{formatCurrency(selectedTemplate.ctc.totalCTC)}</span>
+                    <span className="font-medium">{formatCurrency(selectedTemplate.total_ctc)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Total Leaves:</span>
-                    <span className="font-medium">{selectedTemplate.leaves.EL + selectedTemplate.leaves.CL} days</span>
+                    <span className="font-medium">
+                      {selectedTemplate.earned_leave + selectedTemplate.casual_leave} days
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -233,11 +297,11 @@ export default function CreateEmployeePage() {
                         <Label>Full Name *</Label>
                         <Input
                           placeholder="Enter full name"
-                          value={employeeData.personalInfo?.name || ""}
+                          value={employeeData.name}
                           onChange={(e) =>
                             setEmployeeData({
                               ...employeeData,
-                              personalInfo: { ...employeeData.personalInfo!, name: e.target.value },
+                              name: e.target.value,
                             })
                           }
                         />
@@ -247,11 +311,11 @@ export default function CreateEmployeePage() {
                         <Input
                           type="email"
                           placeholder="Enter email address"
-                          value={employeeData.personalInfo?.email || ""}
+                          value={employeeData.email}
                           onChange={(e) =>
                             setEmployeeData({
                               ...employeeData,
-                              personalInfo: { ...employeeData.personalInfo!, email: e.target.value },
+                              email: e.target.value,
                             })
                           }
                         />
@@ -263,11 +327,11 @@ export default function CreateEmployeePage() {
                         <Label>Phone Number</Label>
                         <Input
                           placeholder="Enter phone number"
-                          value={employeeData.personalInfo?.phone || ""}
+                          value={employeeData.phone}
                           onChange={(e) =>
                             setEmployeeData({
                               ...employeeData,
-                              personalInfo: { ...employeeData.personalInfo!, phone: e.target.value },
+                              phone: e.target.value,
                             })
                           }
                         />
@@ -295,11 +359,11 @@ export default function CreateEmployeePage() {
                       <Label>Address</Label>
                       <Textarea
                         placeholder="Enter full address"
-                        value={employeeData.personalInfo?.address || ""}
+                        value={employeeData.address}
                         onChange={(e) =>
                           setEmployeeData({
                             ...employeeData,
-                            personalInfo: { ...employeeData.personalInfo!, address: e.target.value },
+                            address: e.target.value,
                           })
                         }
                       />
@@ -312,17 +376,11 @@ export default function CreateEmployeePage() {
                           <Label>Contact Name</Label>
                           <Input
                             placeholder="Enter name"
-                            value={employeeData.personalInfo?.emergencyContact?.name || ""}
+                            value={employeeData.emergency_contact_name}
                             onChange={(e) =>
                               setEmployeeData({
                                 ...employeeData,
-                                personalInfo: {
-                                  ...employeeData.personalInfo!,
-                                  emergencyContact: {
-                                    ...employeeData.personalInfo!.emergencyContact!,
-                                    name: e.target.value,
-                                  },
-                                },
+                                emergency_contact_name: e.target.value,
                               })
                             }
                           />
@@ -331,17 +389,11 @@ export default function CreateEmployeePage() {
                           <Label>Contact Phone</Label>
                           <Input
                             placeholder="Enter phone"
-                            value={employeeData.personalInfo?.emergencyContact?.phone || ""}
+                            value={employeeData.emergency_contact_phone}
                             onChange={(e) =>
                               setEmployeeData({
                                 ...employeeData,
-                                personalInfo: {
-                                  ...employeeData.personalInfo!,
-                                  emergencyContact: {
-                                    ...employeeData.personalInfo!.emergencyContact!,
-                                    phone: e.target.value,
-                                  },
-                                },
+                                emergency_contact_phone: e.target.value,
                               })
                             }
                           />
@@ -350,17 +402,11 @@ export default function CreateEmployeePage() {
                           <Label>Relationship</Label>
                           <Input
                             placeholder="e.g., Spouse, Parent"
-                            value={employeeData.personalInfo?.emergencyContact?.relation || ""}
+                            value={employeeData.emergency_contact_relation}
                             onChange={(e) =>
                               setEmployeeData({
                                 ...employeeData,
-                                personalInfo: {
-                                  ...employeeData.personalInfo!,
-                                  emergencyContact: {
-                                    ...employeeData.personalInfo!.emergencyContact!,
-                                    relation: e.target.value,
-                                  },
-                                },
+                                emergency_contact_relation: e.target.value,
                               })
                             }
                           />
@@ -375,11 +421,11 @@ export default function CreateEmployeePage() {
                         <Label>Department</Label>
                         <Input
                           disabled={!!selectedTemplate}
-                          value={employeeData.workInfo?.department || ""}
+                          value={employeeData.department}
                           onChange={(e) =>
                             setEmployeeData({
                               ...employeeData,
-                              workInfo: { ...employeeData.workInfo!, department: e.target.value },
+                              department: e.target.value,
                             })
                           }
                         />
@@ -389,11 +435,11 @@ export default function CreateEmployeePage() {
                         <Label>Position</Label>
                         <Input
                           disabled={!!selectedTemplate}
-                          value={employeeData.workInfo?.position || ""}
+                          value={employeeData.position}
                           onChange={(e) =>
                             setEmployeeData({
                               ...employeeData,
-                              workInfo: { ...employeeData.workInfo!, position: e.target.value },
+                              position: e.target.value,
                             })
                           }
                         />
@@ -405,11 +451,11 @@ export default function CreateEmployeePage() {
                         <Label>Level</Label>
                         <Select
                           disabled={!!selectedTemplate}
-                          value={employeeData.workInfo?.level || ""}
+                          value={employeeData.level}
                           onValueChange={(value) =>
                             setEmployeeData({
                               ...employeeData,
-                              workInfo: { ...employeeData.workInfo!, level: value },
+                              level: value,
                             })
                           }
                         >
@@ -430,11 +476,11 @@ export default function CreateEmployeePage() {
                         <Label>Manager</Label>
                         <Input
                           placeholder="Enter manager name"
-                          value={employeeData.workInfo?.manager || ""}
+                          value={employeeData.manager}
                           onChange={(e) =>
                             setEmployeeData({
                               ...employeeData,
-                              workInfo: { ...employeeData.workInfo!, manager: e.target.value },
+                              manager: e.target.value,
                             })
                           }
                         />
@@ -446,11 +492,11 @@ export default function CreateEmployeePage() {
                         <Label>Location</Label>
                         <Input
                           placeholder="Enter work location"
-                          value={employeeData.workInfo?.location || ""}
+                          value={employeeData.location}
                           onChange={(e) =>
                             setEmployeeData({
                               ...employeeData,
-                              workInfo: { ...employeeData.workInfo!, location: e.target.value },
+                              location: e.target.value,
                             })
                           }
                         />
@@ -477,11 +523,11 @@ export default function CreateEmployeePage() {
                     <div className="space-y-2">
                       <Label>Employment Type</Label>
                       <Select
-                        value={employeeData.workInfo?.employmentType || "Full-time"}
+                        value={employeeData.employment_type}
                         onValueChange={(value: any) =>
                           setEmployeeData({
                             ...employeeData,
-                            workInfo: { ...employeeData.workInfo!, employmentType: value },
+                            employment_type: value,
                           })
                         }
                       >
@@ -514,11 +560,11 @@ export default function CreateEmployeePage() {
                         <Input
                           type="number"
                           disabled={!!selectedTemplate}
-                          value={employeeData.compensation?.basicSalary || 0}
+                          value={employeeData.basic_salary}
                           onChange={(e) =>
                             setEmployeeData({
                               ...employeeData,
-                              compensation: { ...employeeData.compensation!, basicSalary: Number(e.target.value) },
+                              basic_salary: Number(e.target.value),
                             })
                           }
                         />
@@ -528,11 +574,11 @@ export default function CreateEmployeePage() {
                         <Input
                           type="number"
                           disabled={!!selectedTemplate}
-                          value={employeeData.compensation?.hra || 0}
+                          value={employeeData.hra}
                           onChange={(e) =>
                             setEmployeeData({
                               ...employeeData,
-                              compensation: { ...employeeData.compensation!, hra: Number(e.target.value) },
+                              hra: Number(e.target.value),
                             })
                           }
                         />
@@ -545,11 +591,11 @@ export default function CreateEmployeePage() {
                         <Input
                           type="number"
                           disabled={!!selectedTemplate}
-                          value={employeeData.compensation?.allowances || 0}
+                          value={employeeData.allowances}
                           onChange={(e) =>
                             setEmployeeData({
                               ...employeeData,
-                              compensation: { ...employeeData.compensation!, allowances: Number(e.target.value) },
+                              allowances: Number(e.target.value),
                             })
                           }
                         />
@@ -559,11 +605,11 @@ export default function CreateEmployeePage() {
                         <Input
                           type="number"
                           disabled={!!selectedTemplate}
-                          value={employeeData.compensation?.bonus || 0}
+                          value={employeeData.bonus}
                           onChange={(e) =>
                             setEmployeeData({
                               ...employeeData,
-                              compensation: { ...employeeData.compensation!, bonus: Number(e.target.value) },
+                              bonus: Number(e.target.value),
                             })
                           }
                         />
@@ -573,14 +619,7 @@ export default function CreateEmployeePage() {
                     <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                       <div className="flex justify-between items-center">
                         <span className="font-medium text-green-900">Total CTC:</span>
-                        <span className="text-xl font-bold text-green-900">
-                          {formatCurrency(
-                            (employeeData.compensation?.basicSalary || 0) +
-                              (employeeData.compensation?.hra || 0) +
-                              (employeeData.compensation?.allowances || 0) +
-                              (employeeData.compensation?.bonus || 0),
-                          )}
-                        </span>
+                        <span className="text-xl font-bold text-green-900">{formatCurrency(calculateTotalCTC())}</span>
                       </div>
                     </div>
 
@@ -589,17 +628,15 @@ export default function CreateEmployeePage() {
                       <div className="grid grid-cols-3 gap-4">
                         <div className="text-center p-3 bg-gray-50 rounded">
                           <p className="text-sm text-muted-foreground">Earned Leave</p>
-                          <p className="font-bold">{employeeData.leaves?.EL.total || 0} days</p>
+                          <p className="font-bold">{employeeData.el_total} days</p>
                         </div>
                         <div className="text-center p-3 bg-gray-50 rounded">
                           <p className="text-sm text-muted-foreground">Casual Leave</p>
-                          <p className="font-bold">{employeeData.leaves?.CL.total || 0} days</p>
+                          <p className="font-bold">{employeeData.cl_total} days</p>
                         </div>
                         <div className="text-center p-3 bg-gray-50 rounded">
                           <p className="text-sm text-muted-foreground">Total Leave</p>
-                          <p className="font-bold">
-                            {(employeeData.leaves?.EL.total || 0) + (employeeData.leaves?.CL.total || 0)} days
-                          </p>
+                          <p className="font-bold">{employeeData.el_total + employeeData.cl_total} days</p>
                         </div>
                       </div>
                     </div>
@@ -610,7 +647,8 @@ export default function CreateEmployeePage() {
                   <Button variant="outline" onClick={() => window.history.back()}>
                     Cancel
                   </Button>
-                  <Button onClick={handleCreateEmployee} disabled={!selectedTemplate}>
+                  <Button onClick={handleCreateEmployee} disabled={!selectedTemplate || isSubmitting}>
+                    {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                     <UserPlus className="h-4 w-4 mr-2" />
                     Create Employee
                   </Button>
